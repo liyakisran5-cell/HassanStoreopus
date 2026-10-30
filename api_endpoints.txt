@@ -1,0 +1,9 @@
+# API Endpoints & Workers.dev URLs Found
+
+## Regular API Endpoints:
+
+https://ajax.googleapis.com/ajax/libs/webfont/1.6.26/webfont.js
+https://api.opus.pro/api/client-access-control?q=ipRisk
+https://cdn.jsdelivr.net/npm/statsig-sidecar/dist/index.min.js?apikey=client-ECxX0UGYv9w3jWKTO7e2doE79AWuSCSygX0RzesRzEs
+https://fonts.googleapis.com
+
