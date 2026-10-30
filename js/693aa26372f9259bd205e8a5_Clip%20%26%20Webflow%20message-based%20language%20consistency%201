@@ -1,0 +1,156 @@
+// Filename changed 12-11-2025
+'use strict';
+// Message-based redirection
+(() => {
+  // Initial load (auto redirect by iframe)
+  const SUPPORTED_LANGS = new Set(['en', 'pt-BR', 'es-ES', 'de-DE', 'fr-FR']);
+  const SWITCHER_LANG_MAP = {
+    'en-US': 'en',
+    es: 'es-ES',
+    'pt-BR': 'pt-BR',
+    'de-DE': 'de-DE',
+    'fr-FR': 'fr-FR'
+  };
+  const DEFAULT_LANG = [...SUPPORTED_LANGS][0];
+  const CLIP_APP_URL = 'https://clip.opus.pro';
+
+  function isRedirectDisabled() {
+    const isDisabled = new URLSearchParams(window.location.search).get('langredirect') === 'off';
+    if (isDisabled) {
+      console.log('[LANGUAGE SYNC]: Message-based redirection disabled via URL parameter langredirect=off');
+    }
+    return isDisabled;
+  }
+
+  function getCurrentLang() {
+    const [, lang] =
+      window.location.pathname.match(/\/([a-z]{2}-[a-z]{2})(\/|$)/) || [];
+    const detectedLang = lang || DEFAULT_LANG;
+    console.log('[LANGUAGE SYNC]: Current language detected:', detectedLang);
+    return detectedLang;
+  }
+
+  function normalizePath(path) {
+    return path || '/';
+  }
+
+  function buildNewPath(targetLang, currentLang, currentPath) {
+    let newPath = currentPath;
+    if (currentLang !== DEFAULT_LANG) {
+      newPath = newPath.replace(`/${currentLang}`, '');
+    }
+    if (targetLang !== DEFAULT_LANG) {
+      newPath = `/${targetLang}${newPath === '/' ? '' : newPath}`;
+    }
+    return normalizePath(newPath);
+  }
+
+  function redirectToLang(lang) {
+    if (isRedirectDisabled()) {
+      return;
+    }
+
+    console.log(
+      '[LANGUAGE SYNC]: Received request to redirect to language:',
+      lang
+    );
+
+    const targetLang = SUPPORTED_LANGS.has(lang) ? lang : DEFAULT_LANG;
+    const normalizedTargetLang = targetLang.toLowerCase();
+
+    // fallback to default lang if language is not supported
+    if (!SUPPORTED_LANGS.has(lang)) {
+      console.log(
+        '[LANGUAGE SYNC]: Language not supported:',
+        lang,
+        'redirecting to default:',
+        DEFAULT_LANG
+      );
+    }
+
+    const currentLang = getCurrentLang();
+    if (currentLang === normalizedTargetLang) {
+      console.log(
+        '[LANGUAGE SYNC]: Language matches current page, no redirect needed'
+      );
+      return;
+    }
+
+    const currentUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+    const newPath = buildNewPath(
+      normalizedTargetLang,
+      currentLang,
+      window.location.pathname
+    );
+    const newUrl = `${newPath}${window.location.search}${window.location.hash}`;
+
+    if (newUrl !== currentUrl) {
+      console.log('[LANGUAGE SYNC]: Performing redirect to:', newUrl);
+      window.location.href = newUrl;
+    }
+  }
+
+  function toggleLangSwitcherVisibility(shouldDisplay) {
+    console.log(
+      '[LANGUAGE SYNC]: Setting language switcher visibility:',
+      shouldDisplay
+    );
+    const langSwitcher = document.querySelector(
+      '[data-element="footer-locale-switcher"]'
+    );
+    if (langSwitcher) {
+      langSwitcher.style.display = shouldDisplay ? 'block' : 'none';
+    }
+  }
+
+  function handleMessage(event) {
+    if (event.origin !== CLIP_APP_URL) return;
+
+    if (event.data.type === 'lang') {
+      const requestedLang = event.data.content.lang;
+      redirectToLang(requestedLang);
+    }
+
+    if (event.data.type === 'lang_switcher') {
+      const displayValue = event.data.content?.display;
+      if (typeof displayValue === 'boolean') {
+        toggleLangSwitcherVisibility(displayValue);
+      }
+    }
+  }
+
+  window.addEventListener('message', handleMessage);
+
+  // User-initiated language change (from parent to iframe)
+  function getLangCode(hreflang) {
+    return SWITCHER_LANG_MAP[hreflang] || hreflang;
+  }
+
+  function sendLangMessage(langCode) {
+    const iframe = document.querySelector(`iframe[src*="${CLIP_APP_URL}"]`);
+    if (iframe?.contentWindow) {
+      iframe.contentWindow.postMessage(
+        { type: 'change_language', content: { lang: langCode } },
+        CLIP_APP_URL
+      );
+    }
+  }
+
+  function handleLangLinkClick(e) {
+    if (isRedirectDisabled()) {
+      return;
+    }
+    e.preventDefault();
+    const langCode = getLangCode(e.currentTarget.getAttribute('hreflang'));
+    sendLangMessage(langCode);
+  }
+
+  function setupLangLinks() {
+    const langLinks = document.querySelectorAll('a[hreflang]');
+    langLinks.forEach(function (link) {
+      link.addEventListener('click', handleLangLinkClick);
+    });
+  }
+
+  document.addEventListener('DOMContentLoaded', setupLangLinks);
+})();
